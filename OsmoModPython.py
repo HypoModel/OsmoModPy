@@ -23,6 +23,7 @@ modname = "Osmo"
 mainwin = HypoMain("HypoMod", pos, size, respath, mainpath, modname)
 mainwin.Show()
 mainwin.SetFocus()
+go_foreground()
 app.MainLoop()
 
 
