@@ -11,7 +11,6 @@ from HypoModPy.hypogrid import *
 #ID_heatflag = wx.NewIdRef()
 
 
-
 class OsmoMod(Mod):
     def __init__(self, mainwin, tag):
         Mod.__init__(self, mainwin, tag)
@@ -102,7 +101,7 @@ class OsmoDat():
         self.storesize = 10000
 
         # initialise arrays for recording model variables (or any model values)
-        self.water = datarray(self.storesize + 1)
+        self.water = pdata(self.storesize + 1)
         self.salt = pdata(self.storesize + 1)
         self.osmo = pdata(self.storesize + 1)
         self.vaso = pdata(self.storesize + 1)
@@ -224,8 +223,8 @@ class OsmoModel(ModThread):
         waterloss = osmoparams["waterloss"]
 
         # Initialise variables
-        water = 50
-        salt = 2000
+        water = 42000
+        salt = 100
         osmo = salt / water
         vaso = 0
 
