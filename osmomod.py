@@ -119,8 +119,7 @@ class OsmoBox(ParamBox):
         self.InitMenu()
 
         # Model Flags
-        ID_randomflag = wx.NewIdRef()   # request a new control ID
-        self.AddFlag(ID_randomflag, "randomflag", "Fixed Random Seed", 0)         # menu accessed flags for switching model code
+        self.AddFlag("randomflag", "Fixed Random Seed", 0)         # menu accessed flags for switching model code
 
 
         # Parameter controls
