@@ -20,7 +20,7 @@ size = wx.Size(400, 500)
 mainpath = ""
 respath = ""
 modname = "Osmo"
-mainwin = HypoMain("HypoMod", pos, size, respath, mainpath)
+mainwin = HypoMain("HypoMod", pos, size, respath, mainpath, modname)
 mainwin.Show()
 mainwin.SetFocus()
 #go_foreground()
