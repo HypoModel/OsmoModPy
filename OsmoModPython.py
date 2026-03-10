@@ -11,9 +11,6 @@ import wx
 from HypoModPy.hypomain import *
 
 
-#from Cocoa import NSApp, NSApplication
-
-
 app = wx.App(False)
 pos = wx.DefaultPosition
 size = wx.Size(400, 500)
@@ -23,7 +20,9 @@ modname = "Osmo"
 mainwin = HypoMain("HypoMod", pos, size, respath, mainpath, modname)
 mainwin.Show()
 mainwin.SetFocus()
-#go_foreground()
+mainwin.Show(True)
+wx.CallAfter(mainwin.Raise)
+go_foreground()
 app.MainLoop()
 
 
