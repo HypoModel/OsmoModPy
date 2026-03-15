@@ -44,7 +44,7 @@ class OsmoMod(Mod):
         self.ModLoad()
         print("Osmo Model OK")
 
-        self.osmodata = OsmoDat()
+        self.osmodata = OsmoDat(100000)
         self.PlotData()
         self.graphload = True
 
@@ -63,6 +63,13 @@ class OsmoMod(Mod):
         self.plotbase.AddPlot(PlotDat(self.osmodata.salt, 0, 2000, 0, 100, "salt", "line", 1, "red"), "salt")
         self.plotbase.AddPlot(PlotDat(self.osmodata.osmo, 0, 2000, 0, 100, "osmo", "line", 1, "green"), "osmo")
         self.plotbase.AddPlot(PlotDat(self.osmodata.vaso, 0, 2000, 0, 100, "vaso", "line", 1, "purple"), "vaso")
+        self.plotbase.AddPlot(PlotDat(self.osmodata.water_ECF, 0, 2000, 0, 5000, "water ECF", "line", 1, "green"), "water_ECF")
+        self.plotbase.AddPlot(PlotDat(self.osmodata.water_ICF, 0, 2000, 0, 5000, "water ICF", "line", 1, "red"), "water_ICF")
+        self.plotbase.AddPlot(PlotDat(self.osmodata.salt_ECF, 0, 2000, 0, 100, "salt ECF", "line", 1, "lightred"), "salt_ECF")
+        self.plotbase.AddPlot(PlotDat(self.osmodata.salt_ICF, 0, 2000, 0, 100, "salt ICF", "line", 1, "lightblue"), "salt_ICF")
+        self.plotbase.AddPlot(PlotDat(self.osmodata.osmo_ECF, 0, 2000, 0, 100, "osmo ECF", "line", 1, "lightgreen"), "osmo_ECF")
+        self.plotbase.AddPlot(PlotDat(self.osmodata.osmo_ICF, 0, 2000, 0, 100, "osmo ICF", "line", 1, "lightblue"), "osmo_ICF")
+        self.plotbase.AddPlot(PlotDat(self.osmodata.urine_water, 0, 2000, 0, 5000, "urine water", "line", 1, "yellow"), "urine_water")
 
 
     def DefaultPlots(self):
@@ -82,7 +89,7 @@ class OsmoMod(Mod):
         #self.osmodata.water.label = "plot test"
 
         self.mainwin.scalebox.GraphUpdateAll()
-        #DiagWrite("Model thread OK\n\n")
+        DiagWrite("Model thread OK\n\n")
 
 
     def OnModThreadProgress(self, event):
@@ -97,15 +104,28 @@ class OsmoMod(Mod):
 
 
 class OsmoDat():
-    def __init__(self):
-        self.storesize = 10000
+    def __init__(self, storesize):
+        self.storesize = storesize
 
         # initialise arrays for recording model variables (or any model values)
         self.water = pdata(self.storesize + 1)
         self.salt = pdata(self.storesize + 1)
         self.osmo = pdata(self.storesize + 1)
         self.vaso = pdata(self.storesize + 1)
+        self.water_ECF = pdata(self.storesize + 1)
+        self.water_ICF = pdata(self.storesize + 1)
+        self.salt_ECF = pdata(self.storesize + 1)
+        self.salt_ICF = pdata(self.storesize + 1)
+        self.osmo_ECF = pdata(self.storesize + 1)
+        self.osmo_ICF = pdata(self.storesize + 1)
+        self.urine_water = pdata(self.storesize + 1)
+        self.urine_salt = pdata(self.storesize + 1)
+        self.V2 = pdata(self.storesize + 1)
 
+
+    def reset_all(self):
+        for value in vars(self).values():
+            if isinstance(value, pdata): value.reset()
 
 
 class OsmoBox(ParamBox):
@@ -127,7 +147,18 @@ class OsmoBox(ParamBox):
         # ----------------------------------------------------------------------------------
         self.paramset.AddCon("runtime", "Run Time", 2000, 1, 0)
         self.paramset.AddCon("hstep", "h Step", 1, 0.1, 1)
-        self.paramset.AddCon("waterloss", "Water Loss", 0, 0.00001, 5)
+        self.paramset.AddCon("waterloss", "Water Loss", 0, 1, 4)
+        self.paramset.AddCon("water_init", "Water Init", 40000, 1, 2)
+        self.paramset.AddCon("salt_ECF_init", "Salt ECF Init", 100, 0.1, 2)
+        self.paramset.AddCon("salt_ICF_init", "Salt ICF Init", 80, 0.1, 2)
+        self.paramset.AddCon("ktrans", "ktrans", 0, 0.1, 4)
+
+        self.paramset.AddCon("urine_min", "Urine Min", 400, 1, 1)
+        self.paramset.AddCon("urine_max", "Urine Max", 15000, 1, 1)
+        self.paramset.AddCon("osmo_thresh", "Osmolality Threshold", 282, 1, 1)
+        self.paramset.AddCon("k_V", "k_V", 0.4, 0.01, 4)
+        self.paramset.AddCon("R_n", "R_n", 2, 0.1, 4)
+        self.paramset.AddCon("R_k", "R_k", 2, 0.1, 4)
 
         self.ParamLayout(2)   # layout parameter controls in two columns
 
@@ -220,52 +251,93 @@ class OsmoModel(ModThread):
         # Read parameters
         runtime = int(osmoparams["runtime"])
         waterloss = osmoparams["waterloss"]
+        water_init = osmoparams["water_init"]
+        #salt_init = osmoparams["salt_init"]
+        salt_ECF_init = osmoparams["salt_ECF_init"]
+        salt_ICF_init = osmoparams["salt_ICF_init"]
+        ktrans = osmoparams["ktrans"]
+
+        urine_min = osmoparams["urine_min"]
+        urine_max = osmoparams["urine_max"]
+        osmo_thresh = osmoparams["osmo_thresh"]
+        k_V = osmoparams["k_V"]
+        R_n = osmoparams["R_n"]
+        R_k = osmoparams["R_k"]
 
         # Initialise variables
-        water = 42000
-        salt = 100
-        osmo = salt / water
-        vaso = 0
+        water = water_init
+        #salt = salt_init
+        #osmo = (salt * 34.2) / (water / 1000)
+        water_ECF = water_init * 0.33
+        water_ICF = water_init * 0.67
+        salt_ECF = salt_ECF_init
+        salt_ICF = salt_ICF_init
+        osmo_ECF = (salt_ECF * 34.2) / (water_ECF / 1000)
+        osmo_ICF = salt_ICF / (water_ICF / 1000)
+        water_trans = 0
 
-        # Initialise model variable recording arrays
-        osmodata.water.clear()
-        osmodata.salt.clear()
-        osmodata.osmo.clear()
-        osmodata.vaso.clear()
+        # Convert from ml/hour to ml/second
+        waterloss = waterloss / 86400
+        urine_min = urine_min / 86400
+        urine_max = urine_max / 86400
 
-        # Initialise model variables
-        osmodata.water[0] = water
-        osmodata.salt[0] = salt
-        osmodata.osmo[0] = osmo
-        osmodata.vaso[0] = vaso
-        osmo_thresh = 280
-        v_grad = 0.2
-        v_max = 20
+        # Record initial values
+        osmodata.water_ECF[0] = water_ECF
+        osmodata.water_ICF[0] = water_ICF
+        osmodata.salt_ECF[0] = salt_ECF
+        osmodata.salt_ICF[0] = salt_ICF
+        osmodata.osmo_ECF[0] = osmo_ECF
+        osmodata.osmo_ICF[0] = osmo_ICF
+        osmodata.urine_water[0] = urine_min * 86400   # Record minimum urine output at time 0
+        osmodata.vaso[0] = 0
+
+        DiagWrite(f"starting model loop, runtime {runtime}\n")
 
         # Run model loop
         for i in range(1, runtime + 1):
 
-            if i%100 == 0: osmobox.SetCount(i * 100 / runtime)     # Update run progress % in model panel
+            #if i%100 == 0: osmobox.SetCount(i * 100 / runtime)     # Update run progress % in model panel
+            if i%100 == 0:
+                progevent = ModThreadEvent(ModThreadProgressEvent)
+                progevent.SetInt(int(i * 100 / runtime)) 
+                wx.QueueEvent(self.mod, progevent)                        # Update run progress % in model panel
 
-            water = water - (water * waterloss)
-            salt = salt
-            osmo = salt / water
-            if osmo < osmo_thresh: vaso = 0
-            else: 
-                vaso = v_grad * (osmo - osmo_thresh)
-                if vaso > v_max: vaso = v_max
+            osmo_ECF = (salt_ECF * 34.2) / (water_ECF / 1000)
+            osmo_ICF = salt_ICF / (water_ICF / 1000)
+            water_trans = ktrans * (osmo_ECF - osmo_ICF)
+
+            if osmo_ECF > osmo_thresh: vaso = k_V * (osmo_ECF - osmo_thresh)
+            else: vaso = 0
+
+            R_V2 = pow(vaso, R_n) / (pow(R_k, R_n) + pow(vaso, R_n))
+            urine_water = urine_min + (1 - R_V2) * (urine_max - urine_min)
+            water_ECF = water_ECF - waterloss + water_trans - urine_water
+            water_ICF = water_ICF - water_trans
+            if water_ECF < 0: water_ECF = 0
+
+            #salt = salt
+            #osmo = (salt * 34.2) / (water / 1000)
 
             # Record model variables
-            osmodata.water[i] = water
-            osmodata.salt[i] = salt
-            osmodata.osmo[i] = osmo
+            osmodata.water_ECF[i] = water_ECF
+            osmodata.water_ICF[i] = water_ICF
+            osmodata.salt_ECF[i] = salt_ECF
+            osmodata.salt_ICF[i] = salt_ICF
+            osmodata.osmo_ECF[i] = osmo_ECF
+            osmodata.osmo_ICF[i] = osmo_ICF
+            osmodata.urine_water[i] = urine_water * 86400
             osmodata.vaso[i] = vaso
 
+        DiagWrite("model loop ok\n")
 
         # Set plot time range
-        osmodata.water.xmax = runtime * 1.1
-        osmodata.salt.xmax = runtime * 1.1
-        osmodata.osmo.xmax = runtime * 1.1
+        osmodata.water_ECF.xmax = runtime * 1.1
+        osmodata.water_ICF.xmax = runtime * 1.1
+        osmodata.salt_ECF.xmax = runtime * 1.1
+        osmodata.salt_ICF.xmax = runtime * 1.1
+        osmodata.osmo_ECF.xmax = runtime * 1.1
+        osmodata.osmo_ICF.xmax = runtime * 1.1
+        osmodata.urine_water.xmax = runtime * 1.1
         osmodata.vaso.xmax = runtime * 1.1
 
 
