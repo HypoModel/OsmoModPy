@@ -1,14 +1,19 @@
 
-import wx
+
+import os
 import random
-import numpy as np
+from datetime import datetime
 
-from HypoModPy.hypomods import *
-from HypoModPy.hypoparams import *
-from HypoModPy.hypodat import *
-from HypoModPy.hypogrid import *
+import wx
 
-#ID_heatflag = wx.NewIdRef()
+from HypoModPy.hypomods import (
+    Mod, ModThread, ModThreadEvent,
+    ModThreadCompleteEvent, ModThreadProgressEvent
+)
+from HypoModPy.hypoparams import ParamBox
+from HypoModPy.hypodat import PlotDat, pdata
+from HypoModPy.hypogrid import GridBox
+from HypoModPy.hypotools import DiagWrite
 
 
 class OsmoMod(Mod):
