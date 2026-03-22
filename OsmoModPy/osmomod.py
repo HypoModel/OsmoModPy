@@ -17,8 +17,8 @@ from HypoModPy.hypotools import DiagWrite
 
 
 class OsmoMod(Mod):
-    def __init__(self, mainwin, tag):
-        Mod.__init__(self, mainwin, tag)
+    def __init__(self, mainwin, tag, label="", type=""):
+        Mod.__init__(self, mainwin, tag, label, type)
 
         if mainwin.modpath != "": self.path = mainwin.modpath + "/Osmo"
         else: self.path = "Osmo"
